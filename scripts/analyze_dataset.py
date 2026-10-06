@@ -278,6 +278,67 @@ def extract_season(title):
     return None
 
 
+def extract_tournament_season(title, tournament_id):
+    text = title or ""
+    if tournament_id in {
+        "dtdv",
+        "dtdv-series-b",
+        "tu-phuong-dai-chien",
+        "dau-truong-huyen-thoai",
+        "gcs",
+    }:
+        m = re.search(r"(?i)(?:mùa\s+)?(xuân|hè|đông)\s+(20\d{2})", text)
+        if m:
+            prefix = {
+                "dtdv": "ĐTDV",
+                "dtdv-series-b": "ĐTDV Series B",
+                "tu-phuong-dai-chien": "Tứ Phương Đại Chiến",
+                "dau-truong-huyen-thoai": "Đấu Trường Huyền Thoại",
+                "gcs": "GCS",
+            }[tournament_id]
+            return f"{prefix} {m.group(1).title()} {m.group(2)}"
+
+    if tournament_id in {"aic", "apl", "awc"}:
+        alias = tournament_id.upper()
+        m = re.search(rf"(?i)\b{alias}\s*(20\d{{2}})\b", text)
+        if m:
+            return f"{alias} {m.group(1)}"
+
+    if tournament_id == "sea-games":
+        m = re.search(r"(?i)sea\s*games\s*(\d{2})\b", text)
+        if m:
+            return f"SEA Games {m.group(1)}"
+
+    if tournament_id == "rpl":
+        m = re.search(r"(?i)rpl[^|]{0,40}?mùa\s*(\d{1,2})\b", text)
+        if m:
+            return f"RPL Season {m.group(1)}"
+
+    return None
+
+
+def extract_vs_team_candidates(title):
+    result = []
+    for segment in re.split(r"[|\n]", title or ""):
+        if not re.search(r"(?i)\bvs\.?\b", segment):
+            continue
+        m = re.search(r"(?i)(.{1,45}?)\s+vs\.?\s+(.{1,45})", segment.strip())
+        if not m:
+            continue
+        left, right = m.group(1), m.group(2)
+        left = re.sub(
+            r"(?i)^(?:🔴\s*)?(?:trực tiếp|highlight|chung kết|bán kết|ck)\s*[:\-]?\s*",
+            "",
+            left,
+        )
+        right = re.split(r"\s+-\s+|\s+\[|\s+:\s+", right)[0]
+        for candidate in (left, right):
+            candidate = re.sub(r"^[^\wÀ-ỹ]+|[^\wÀ-ỹ. '&-]+$", "", candidate).strip()
+            if 2 <= len(candidate) <= 35 and len(candidate.split()) <= 6:
+                result.append(candidate)
+    return result
+
+
 def extract_game_number(title):
     patterns = [
         r"(?i)\b(?:game|ván|map)\s*#?\s*(\d{1,2})\b",
@@ -396,6 +457,7 @@ def main():
     team_index = defaultdict(list)
     candidate_skins = {}
     candidate_players = Counter()
+    candidate_teams = Counter()
     totals = Counter()
 
     game_fp = (game_dir / "videos.jsonl").open("w", encoding="utf-8")
@@ -501,8 +563,20 @@ def main():
 
             primary_game = game_types[0] if game_types else None
             primary_esports = esports_types[0] if esports_types else None
-            season = extract_season(base.get("title") or "")
-            game_number = extract_game_number(base.get("title") or "")
+            title_text = base.get("title") or ""
+            tournament_season_links = []
+            for tournament in tournament_mentions:
+                parsed_season = extract_tournament_season(title_text, tournament["id"])
+                if parsed_season:
+                    tournament_season_links.append(
+                        {"tournament_id": tournament["id"], "season": parsed_season}
+                    )
+            season = (
+                tournament_season_links[0]["season"]
+                if tournament_season_links
+                else extract_season(title_text)
+            )
+            game_number = extract_game_number(title_text)
 
             lore_keywords = sum(game_tax.get("story_groups", {}).values(), [])
             highlight_keywords = esports_tax.get("content_types", {}).get("highlight", [])
@@ -575,6 +649,7 @@ def main():
                     "tournaments": tournament_mentions,
                     "teams": team_mentions,
                     "season": season,
+                    "tournament_seasons": tournament_season_links,
                     "game_number": game_number,
                     "highlight_kind": highlight_kind,
                     "highlight_segments": highlight_segments,
@@ -587,8 +662,16 @@ def main():
 
                 for t in tournament_mentions:
                     tournament_stats[t["id"]]["videos"] += 1
-                    if season:
-                        tournament_seasons[t["id"]][season] += 1
+                    parsed_for_tournament = next(
+                        (
+                            x["season"]
+                            for x in tournament_season_links
+                            if x["tournament_id"] == t["id"]
+                        ),
+                        None,
+                    )
+                    if parsed_for_tournament:
+                        tournament_seasons[t["id"]][parsed_for_tournament] += 1
                     if primary_esports:
                         tournament_stats[t["id"]][primary_esports] += 1
                     tournament_index[t["id"]].append(index_item(base, max(t["confidence"], esports_type_best), primary_esports))
@@ -612,6 +695,9 @@ def main():
                     totals["matches"] += 1
 
                 title = base.get("title") or ""
+                for candidate_team in extract_vs_team_candidates(title):
+                    candidate_teams[candidate_team] += 1
+
                 for pattern in esports_entities.get("player_patterns", []):
                     for m in re.finditer(pattern, title):
                         if m.groups():
@@ -719,6 +805,10 @@ def main():
         quality_dir / "candidate-players.json",
         [{"name": name, "mentions": count} for name, count in candidate_players.most_common(300)],
     )
+    write_json(
+        quality_dir / "candidate-teams.json",
+        [{"name": name, "mentions": count} for name, count in candidate_teams.most_common(500)],
+    )
 
     summary = {
         "input_videos": totals["videos"],
@@ -736,6 +826,7 @@ def main():
         "matches": totals["matches"],
         "candidate_skins": len(candidate_skins),
         "candidate_players": len(candidate_players),
+        "candidate_teams": len(candidate_teams),
     }
     write_json(out / "summary.json", summary)
 
