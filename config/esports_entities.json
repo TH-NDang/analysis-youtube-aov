@@ -1,0 +1,119 @@
+{
+  "tournaments": [
+    {
+      "id": "dtdv",
+      "name": "Đấu Trường Danh Vọng",
+      "aliases": [
+        "ĐTDV",
+        "Dau Truong Danh Vong"
+      ]
+    },
+    {
+      "id": "aic",
+      "name": "Arena of Valor International Championship",
+      "aliases": [
+        "AIC"
+      ]
+    },
+    {
+      "id": "apl",
+      "name": "Arena of Valor Premier League",
+      "aliases": [
+        "APL"
+      ]
+    },
+    {
+      "id": "awc",
+      "name": "Arena of Valor World Cup",
+      "aliases": [
+        "AWC"
+      ]
+    },
+    {
+      "id": "sea-games",
+      "name": "SEA Games",
+      "aliases": [
+        "SEA Games",
+        "SEAGames"
+      ]
+    }
+  ],
+  "teams": [
+    {
+      "id": "saigon-phantom",
+      "name": "Saigon Phantom",
+      "aliases": [
+        "Saigon Phantom",
+        "SGP"
+      ]
+    },
+    {
+      "id": "team-flash",
+      "name": "Team Flash",
+      "aliases": [
+        "Team Flash",
+        "FL"
+      ]
+    },
+    {
+      "id": "fpt-x-flash",
+      "name": "FPT x Flash",
+      "aliases": [
+        "FPT x Flash",
+        "FPT Flash"
+      ]
+    },
+    {
+      "id": "box-gaming",
+      "name": "BOX Gaming",
+      "aliases": [
+        "BOX Gaming",
+        "BOX"
+      ]
+    },
+    {
+      "id": "one-star-esports",
+      "name": "One Star Esports",
+      "aliases": [
+        "One Star Esports",
+        "One Star",
+        "1S"
+      ]
+    },
+    {
+      "id": "tdt-esports",
+      "name": "TDT Esports",
+      "aliases": [
+        "TDT Esports",
+        "TDT"
+      ]
+    },
+    {
+      "id": "gam-esports",
+      "name": "GAM Esports",
+      "aliases": [
+        "GAM Esports",
+        "GAM"
+      ]
+    },
+    {
+      "id": "hev",
+      "name": "HEV",
+      "aliases": [
+        "HEV"
+      ]
+    },
+    {
+      "id": "bss",
+      "name": "BSS",
+      "aliases": [
+        "BSS"
+      ]
+    }
+  ],
+  "player_patterns": [
+    "(?i)\\bMVP\\s+([A-Za-z0-9_.-]{2,20})\\b",
+    "(?i)\\btuyển thủ\\s+([A-Za-z0-9_.-]{2,20})\\b",
+    "(?i)\\bplayer\\s+([A-Za-z0-9_.-]{2,20})\\b"
+  ]
+}
