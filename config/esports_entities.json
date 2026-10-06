@@ -36,6 +36,54 @@
         "SEA Games",
         "SEAGames"
       ]
+    },
+    {
+      "id": "tu-phuong-dai-chien",
+      "name": "Tứ Phương Đại Chiến",
+      "aliases": [
+        "Tứ Phương Đại Chiến",
+        "Tu Phuong Dai Chien"
+      ]
+    },
+    {
+      "id": "dtdv-series-b",
+      "name": "ĐTDV Series B",
+      "aliases": [
+        "ĐTDV Series B",
+        "Dau Truong Danh Vong Series B"
+      ]
+    },
+    {
+      "id": "dau-truong-huyen-thoai",
+      "name": "Đấu Trường Huyền Thoại",
+      "aliases": [
+        "Đấu Trường Huyền Thoại",
+        "Dau Truong Huyen Thoai"
+      ]
+    },
+    {
+      "id": "gcs",
+      "name": "Garena Challenger Series",
+      "aliases": [
+        "GCS",
+        "Garena Challenger Series"
+      ]
+    },
+    {
+      "id": "rpl",
+      "name": "RoV Pro League",
+      "aliases": [
+        "RPL",
+        "RoV Pro League"
+      ]
+    },
+    {
+      "id": "asl",
+      "name": "AOV Star League",
+      "aliases": [
+        "ASL",
+        "AOV Star League"
+      ]
     }
   ],
   "teams": [
