@@ -1,0 +1,45 @@
+{
+  "input_videos": 16988,
+  "domains": {
+    "esports": 12547,
+    "game": 4233,
+    "unclassified": 1694,
+    "low_confidence": 9
+  },
+  "game_content_types": {
+    "hero_esports_moment": 1148,
+    "skin_showcase": 787,
+    "lore_story": 112,
+    "hero_related": 1058,
+    "event_promo": 676,
+    "hero_guide": 99,
+    "game_mode": 43,
+    "patch_update": 150,
+    "hero_spotlight": 97,
+    "cinematic": 32,
+    "hero_gameplay": 25,
+    "hero_update": 6
+  },
+  "esports_content_types": {
+    "short_moment": 4988,
+    "match_full": 4107,
+    "interview": 290,
+    "highlight": 392,
+    "tournament_info": 652,
+    "livestream": 145,
+    "roster": 270,
+    "recap": 33
+  },
+  "hero_dictionary_size": 131,
+  "skin_dictionary_size": 1080,
+  "heroes_with_related_videos": 130,
+  "skins_with_related_videos": 508,
+  "lore_entities_with_videos": 70,
+  "tournaments_detected": 11,
+  "teams_detected": 9,
+  "highlights": 406,
+  "matches": 4520,
+  "candidate_skins": 90,
+  "candidate_players": 57,
+  "candidate_teams": 1236
+}
