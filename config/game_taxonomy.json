@@ -1,0 +1,100 @@
+{
+  "content_types": {
+    "hero_spotlight": [
+      "tâm điểm tướng",
+      "hero spotlight",
+      "giới thiệu tướng",
+      "ra mắt tướng"
+    ],
+    "hero_guide": [
+      "hướng dẫn",
+      "guide",
+      "combo",
+      "cách chơi",
+      "mẹo chơi",
+      "build"
+    ],
+    "hero_gameplay": [
+      "gameplay",
+      "leo rank",
+      "rank",
+      "best play"
+    ],
+    "hero_update": [
+      "cân bằng tướng",
+      "chỉnh sửa tướng",
+      "buff",
+      "nerf",
+      "điều chỉnh tướng"
+    ],
+    "skin_showcase": [
+      "trang phục",
+      "skin",
+      "hiệu ứng chiêu thức",
+      "showcase",
+      "ingame"
+    ],
+    "skin_trailer": [
+      "skin trailer",
+      "trailer trang phục",
+      "trailer skin",
+      "ingame trailer"
+    ],
+    "lore_story": [
+      "cốt truyện",
+      "lore",
+      "tiểu sử",
+      "truyền thuyết",
+      "athanos",
+      "athanor",
+      "story",
+      "nguồn gốc"
+    ],
+    "cinematic": [
+      "cinematic",
+      "phim ngắn",
+      "short film",
+      "animation",
+      "hoạt hình"
+    ],
+    "patch_update": [
+      "cập nhật phiên bản",
+      "bản cập nhật",
+      "patch note",
+      "patch",
+      "valor talk",
+      "cân bằng"
+    ],
+    "event_promo": [
+      "sự kiện",
+      "event",
+      "quà",
+      "sổ sứ mệnh",
+      "vòng quay",
+      "mở bán"
+    ],
+    "game_mode": [
+      "chế độ chơi",
+      "mode",
+      "đấu hạng",
+      "5v5",
+      "3v3"
+    ]
+  },
+  "story_groups": {
+    "lore": [
+      "cốt truyện",
+      "lore",
+      "tiểu sử",
+      "truyền thuyết",
+      "nguồn gốc",
+      "athanor"
+    ],
+    "cinematic": [
+      "cinematic",
+      "phim ngắn",
+      "animation",
+      "hoạt hình"
+    ]
+  }
+}
