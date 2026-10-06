@@ -1,0 +1,138 @@
+name: Analyze YouTube AOV dataset
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: Source release tag in bao-tang-lien-quan
+        required: true
+        default: youtube-deep-2026-10-01
+        type: string
+      sync_garena:
+        description: Refresh hero/skin entities from official Garena academy
+        required: true
+        default: true
+        type: boolean
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/analyze-youtube-aov.yml"
+      - "scripts/**"
+      - "config/**"
+      - "requirements.txt"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: analyze-youtube-aov
+  cancel-in-progress: true
+
+env:
+  SOURCE_REPO: TH-NDang/bao-tang-lien-quan
+  SOURCE_TAG: ${{ github.event.inputs.source_tag || 'youtube-deep-2026-10-01' }}
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  analyze:
+    name: Game + eSports analysis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir -r requirements.txt
+
+      - name: Download deep YouTube release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/source
+          gh release download "$SOURCE_TAG"             --repo "$SOURCE_REPO"             --pattern "youtube-deep-merged-16988.zip"             --dir data/source
+
+          unzip -j data/source/youtube-deep-merged-16988.zip             all-videos.deep.jsonl             deep-enrichment-summary.json             -d data/source
+
+          test -s data/source/all-videos.deep.jsonl
+          echo "Input rows: $(wc -l < data/source/all-videos.deep.jsonl)"
+          ls -lh data/source/all-videos.deep.jsonl
+
+      - name: Sync official Garena hero and skin entities
+        if: ${{ github.event_name == 'push' || github.event.inputs.sync_garena == 'true' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          python scripts/sync_garena_entities.py             --fallback-heroes config/heroes.json             --output-dir data/entities             --workers 8
+
+      - name: Ensure fallback entity files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/entities
+          if [ ! -s data/entities/heroes.json ]; then
+            python - <<'PY'
+          import json
+          from pathlib import Path
+          src=json.loads(Path("config/heroes.json").read_text(encoding="utf-8"))
+          rows=[{"name":n,"slug":n,"source_url":None} for n in src["heroes"]]
+          Path("data/entities/heroes.json").write_text(json.dumps({"heroes":rows},ensure_ascii=False,indent=2),encoding="utf-8")
+          PY
+          fi
+          if [ ! -s data/entities/skins.json ]; then
+            printf '{"source":null,"count":0,"skins":[]}' > data/entities/skins.json
+          fi
+
+      - name: Analyze game and eSports domains
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/analyze_dataset.py             --input data/source/all-videos.deep.jsonl             --output output             --heroes config/heroes.json             --synced-heroes data/entities/heroes.json             --skins data/entities/skins.json             --game-taxonomy config/game_taxonomy.json             --esports-taxonomy config/esports_taxonomy.json             --esports-entities config/esports_entities.json
+
+      - name: Validate analysis
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          s=json.loads(Path("output/summary.json").read_text(encoding="utf-8"))
+          assert s["input_videos"] >= 16000, s
+          assert s["domains"].get("game",0) > 0, s
+          assert s["domains"].get("esports",0) > 0, s
+          assert Path("output/game/hero-video-index.json").stat().st_size > 2
+          assert Path("output/esports/tournament-video-index.json").stat().st_size > 2
+          print(json.dumps(s,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Include entity snapshot
+        shell: bash
+        run: |
+          mkdir -p output/entities
+          cp data/entities/heroes.json output/entities/heroes.json
+          cp data/entities/skins.json output/entities/skins.json
+
+      - name: Publish report to job summary
+        shell: bash
+        run: |
+          cat output/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload analysis artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: analysis-youtube-aov
+          path: output
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
