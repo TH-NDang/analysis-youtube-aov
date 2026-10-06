@@ -50,21 +50,16 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        shell: bash
-        run: |
-          python -m pip install --disable-pip-version-check --no-cache-dir -r requirements.txt
+        run: python -m pip install --disable-pip-version-check --no-cache-dir -r requirements.txt
 
       - name: Download deep YouTube release
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p data/source
-          gh release download "$SOURCE_TAG"             --repo "$SOURCE_REPO"             --pattern "youtube-deep-merged-16988.zip"             --dir data/source
-
-          unzip -j data/source/youtube-deep-merged-16988.zip             all-videos.deep.jsonl             deep-enrichment-summary.json             -d data/source
-
+          ASSET_URL="https://github.com/$SOURCE_REPO/releases/download/$SOURCE_TAG/youtube-deep-merged-16988.zip"
+          curl -L --fail --retry 5 --retry-delay 3 "$ASSET_URL" -o data/source/youtube-deep-merged-16988.zip
+          unzip -j data/source/youtube-deep-merged-16988.zip all-videos.deep.jsonl deep-enrichment-summary.json -d data/source
           test -s data/source/all-videos.deep.jsonl
           echo "Input rows: $(wc -l < data/source/all-videos.deep.jsonl)"
           ls -lh data/source/all-videos.deep.jsonl
@@ -72,9 +67,7 @@ jobs:
       - name: Sync official Garena hero and skin entities
         if: ${{ github.event_name == 'push' || github.event.inputs.sync_garena == 'true' }}
         continue-on-error: true
-        shell: bash
-        run: |
-          python scripts/sync_garena_entities.py             --fallback-heroes config/heroes.json             --output-dir data/entities             --workers 8
+        run: python scripts/sync_garena_entities.py --fallback-heroes config/heroes.json --output-dir data/entities --workers 8
 
       - name: Ensure fallback entity files
         shell: bash
@@ -82,51 +75,29 @@ jobs:
           set -euo pipefail
           mkdir -p data/entities
           if [ ! -s data/entities/heroes.json ]; then
-            python - <<'PY'
-          import json
-          from pathlib import Path
-          src=json.loads(Path("config/heroes.json").read_text(encoding="utf-8"))
-          rows=[{"name":n,"slug":n,"source_url":None} for n in src["heroes"]]
-          Path("data/entities/heroes.json").write_text(json.dumps({"heroes":rows},ensure_ascii=False,indent=2),encoding="utf-8")
-          PY
+            python -c 'import json; from pathlib import Path; src=json.loads(Path("config/heroes.json").read_text(encoding="utf-8")); rows=[{"name":n,"slug":n,"source_url":None} for n in src["heroes"]]; Path("data/entities/heroes.json").write_text(json.dumps({"heroes":rows},ensure_ascii=False,indent=2),encoding="utf-8")'
           fi
           if [ ! -s data/entities/skins.json ]; then
             printf '{"source":null,"count":0,"skins":[]}' > data/entities/skins.json
           fi
 
       - name: Analyze game and eSports domains
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/analyze_dataset.py             --input data/source/all-videos.deep.jsonl             --output output             --heroes config/heroes.json             --synced-heroes data/entities/heroes.json             --skins data/entities/skins.json             --game-taxonomy config/game_taxonomy.json             --esports-taxonomy config/esports_taxonomy.json             --esports-entities config/esports_entities.json
+        run: python scripts/analyze_dataset.py --input data/source/all-videos.deep.jsonl --output output --heroes config/heroes.json --synced-heroes data/entities/heroes.json --skins data/entities/skins.json --game-taxonomy config/game_taxonomy.json --esports-taxonomy config/esports_taxonomy.json --esports-entities config/esports_entities.json
 
       - name: Validate analysis
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          s=json.loads(Path("output/summary.json").read_text(encoding="utf-8"))
-          assert s["input_videos"] >= 16000, s
-          assert s["domains"].get("game",0) > 0, s
-          assert s["domains"].get("esports",0) > 0, s
-          assert Path("output/game/hero-video-index.json").stat().st_size > 2
-          assert Path("output/esports/tournament-video-index.json").stat().st_size > 2
-          print(json.dumps(s,ensure_ascii=False,indent=2))
-          PY
+          python -c 'import json; from pathlib import Path; s=json.loads(Path("output/summary.json").read_text(encoding="utf-8")); assert s["input_videos"]>=16000,s; assert s["domains"].get("game",0)>0,s; assert s["domains"].get("esports",0)>0,s; assert Path("output/game/hero-video-index.json").stat().st_size>2; assert Path("output/esports/tournament-video-index.json").stat().st_size>2; print(json.dumps(s,ensure_ascii=False,indent=2))'
 
       - name: Include entity snapshot
-        shell: bash
         run: |
           mkdir -p output/entities
           cp data/entities/heroes.json output/entities/heroes.json
           cp data/entities/skins.json output/entities/skins.json
 
       - name: Publish report to job summary
-        shell: bash
-        run: |
-          cat output/report.md >> "$GITHUB_STEP_SUMMARY"
+        run: cat output/report.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload analysis artifact
         uses: actions/upload-artifact@v7
