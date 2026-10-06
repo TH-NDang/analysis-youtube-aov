@@ -96,7 +96,7 @@ def keyword_score(fields, keywords, normalized_fields=None):
     for field in fields:
         nt = normalized_fields.get(field, "")
         for kw, nkw in normalized_keywords:
-            if nkw and (f" {nkw} " in f" {nt} " or nkw in nt):
+            if nkw and f" {nkw} " in f" {nt} ":
                 weight = {
                     "title": 0.90,
                     "tags": 0.65,
@@ -179,7 +179,7 @@ def extract_entities(fields, normalized_fields, heroes, skins, esports):
             description_ok=description_ok,
             normalized_fields=normalized_fields,
         )
-        if score >= 0.38 and has_strong_evidence(evidence):
+        if score >= 0.38 and has_strong_evidence(evidence, ("title", "chapters")):
             hero_mentions.append(
                 {
                     "id": hero["id"],
@@ -203,7 +203,7 @@ def extract_entities(fields, normalized_fields, heroes, skins, esports):
             description_ok=True,
             normalized_fields=normalized_fields,
         )
-        if score >= 0.38 and has_strong_evidence(evidence):
+        if score >= 0.38 and has_strong_evidence(evidence, ("title", "chapters")):
             skin_mentions.append(
                 {
                     "id": skin["id"],
@@ -259,7 +259,7 @@ def classify_types(fields, normalized_fields, taxonomy):
     evidence = {}
     for label, keywords in taxonomy.get("content_types", {}).items():
         score, ev = keyword_score(fields, keywords, normalized_fields=normalized_fields)
-        if score >= 0.52 and has_strong_evidence(ev):
+        if score >= 0.52 and has_strong_evidence(ev, ("title", "chapters")):
             scores[label] = round(score, 3)
             evidence[label] = ev
     return scores, evidence
@@ -487,6 +487,15 @@ def main():
             ):
                 game_score = 0.0
 
+            if hero_mentions and not game_type_scores:
+                label = "hero_esports_moment" if esports_score >= 0.65 else "hero_related"
+                game_type_scores[label] = round(hero_best, 3)
+                game_score = max(game_score, hero_best)
+            elif skin_mentions and not game_type_scores:
+                game_type_scores["skin_related"] = round(skin_best, 3)
+                game_score = max(game_score, skin_best)
+
+            game_type_best = max(game_type_scores.values(), default=game_type_best)
             game_types = sorted(game_type_scores, key=game_type_scores.get, reverse=True)
             esports_types = sorted(esports_type_scores, key=esports_type_scores.get, reverse=True)
 
