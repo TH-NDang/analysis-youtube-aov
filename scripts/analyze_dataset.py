@@ -178,7 +178,13 @@ def extract_entities(fields, heroes, skins, esports):
             )
 
     skin_mentions = []
+    matched_hero_names = {norm(x["name"]) for x in hero_mentions}
     for skin in skins:
+        # Most official skin mentions include the hero name. Restricting to
+        # already matched heroes avoids scanning ~1K skins against every long
+        # description while preserving high-confidence title/tag relations.
+        if norm(skin["hero"]) not in matched_hero_names:
+            continue
         score, evidence = evidence_for_aliases(fields, skin["aliases"], description_ok=True)
         if score >= 0.34:
             skin_mentions.append(
