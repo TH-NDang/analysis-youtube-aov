@@ -67,14 +67,18 @@ def text_fields(row):
     }
 
 
-def evidence_for_aliases(fields, aliases, *, description_ok=True):
+def evidence_for_aliases(fields, aliases, *, description_ok=True, normalized_fields=None):
     evidence = []
     best = 0.0
-    for field, text in fields.items():
+    normalized_fields = normalized_fields or {k: norm(v) for k, v in fields.items()}
+    normalized_aliases = [(alias, norm(alias)) for alias in aliases if norm(alias)]
+    for field in fields:
         if field == "description" and not description_ok:
             continue
-        for alias in aliases:
-            if phrase_in(text, alias):
+        ntext = normalized_fields.get(field, "")
+        padded = f" {ntext} "
+        for alias, nalias in normalized_aliases:
+            if f" {nalias} " in padded:
                 weight = FIELD_WEIGHTS[field]
                 best = max(best, weight)
                 evidence.append({"field": field, "matched": alias, "weight": weight})
@@ -84,13 +88,14 @@ def evidence_for_aliases(fields, aliases, *, description_ok=True):
     return best, evidence
 
 
-def keyword_score(fields, keywords):
+def keyword_score(fields, keywords, normalized_fields=None):
     evidence = []
     best = 0.0
-    for field, text in fields.items():
-        nt = norm(text)
-        for kw in keywords:
-            nkw = norm(kw)
+    normalized_fields = normalized_fields or {k: norm(v) for k, v in fields.items()}
+    normalized_keywords = [(kw, norm(kw)) for kw in keywords if norm(kw)]
+    for field in fields:
+        nt = normalized_fields.get(field, "")
+        for kw, nkw in normalized_keywords:
             if nkw and (f" {nkw} " in f" {nt} " or nkw in nt):
                 weight = {
                     "title": 0.90,
@@ -159,13 +164,16 @@ def load_skins(path):
     return rows
 
 
-def extract_entities(fields, heroes, skins, esports):
+def extract_entities(fields, normalized_fields, heroes, skins, esports):
     hero_mentions = []
     for hero in heroes:
         shortest = min(len(norm(x)) for x in hero["aliases"] if norm(x))
         description_ok = shortest >= 4 or " " in norm(hero["name"])
         score, evidence = evidence_for_aliases(
-            fields, hero["aliases"], description_ok=description_ok
+            fields,
+            hero["aliases"],
+            description_ok=description_ok,
+            normalized_fields=normalized_fields,
         )
         if score >= 0.22:
             hero_mentions.append(
@@ -185,7 +193,12 @@ def extract_entities(fields, heroes, skins, esports):
         # description while preserving high-confidence title/tag relations.
         if norm(skin["hero"]) not in matched_hero_names:
             continue
-        score, evidence = evidence_for_aliases(fields, skin["aliases"], description_ok=True)
+        score, evidence = evidence_for_aliases(
+            fields,
+            skin["aliases"],
+            description_ok=True,
+            normalized_fields=normalized_fields,
+        )
         if score >= 0.34:
             skin_mentions.append(
                 {
@@ -199,7 +212,11 @@ def extract_entities(fields, heroes, skins, esports):
 
     tournament_mentions = []
     for item in esports.get("tournaments", []):
-        score, evidence = evidence_for_aliases(fields, [item["name"]] + item.get("aliases", []))
+        score, evidence = evidence_for_aliases(
+            fields,
+            [item["name"]] + item.get("aliases", []),
+            normalized_fields=normalized_fields,
+        )
         if score >= 0.22:
             tournament_mentions.append(
                 {
@@ -214,7 +231,12 @@ def extract_entities(fields, heroes, skins, esports):
     for item in esports.get("teams", []):
         aliases = [item["name"]] + item.get("aliases", [])
         short = min(len(norm(x)) for x in aliases if norm(x))
-        score, evidence = evidence_for_aliases(fields, aliases, description_ok=short >= 4)
+        score, evidence = evidence_for_aliases(
+            fields,
+            aliases,
+            description_ok=short >= 4,
+            normalized_fields=normalized_fields,
+        )
         if score >= 0.34:
             team_mentions.append(
                 {
@@ -228,11 +250,11 @@ def extract_entities(fields, heroes, skins, esports):
     return hero_mentions, skin_mentions, tournament_mentions, team_mentions
 
 
-def classify_types(fields, taxonomy):
+def classify_types(fields, normalized_fields, taxonomy):
     scores = {}
     evidence = {}
     for label, keywords in taxonomy.get("content_types", {}).items():
-        score, ev = keyword_score(fields, keywords)
+        score, ev = keyword_score(fields, keywords, normalized_fields=normalized_fields)
         if score > 0:
             scores[label] = round(score, 3)
             evidence[label] = ev
@@ -383,13 +405,14 @@ def main():
         for row in iter_jsonl(args.input):
             totals["videos"] += 1
             fields = text_fields(row)
+            normalized_fields = {k: norm(v) for k, v in fields.items()}
             base = compact_base(row)
 
             hero_mentions, skin_mentions, tournament_mentions, team_mentions = extract_entities(
-                fields, heroes, skins, esports_entities
+                fields, normalized_fields, heroes, skins, esports_entities
             )
-            game_type_scores, game_evidence = classify_types(fields, game_tax)
-            esports_type_scores, esports_evidence = classify_types(fields, esports_tax)
+            game_type_scores, game_evidence = classify_types(fields, normalized_fields, game_tax)
+            esports_type_scores, esports_evidence = classify_types(fields, normalized_fields, esports_tax)
 
             hero_best = max((x["confidence"] for x in hero_mentions), default=0.0)
             skin_best = max((x["confidence"] for x in skin_mentions), default=0.0)
