@@ -1,0 +1,7 @@
+data/source/
+data/entities/
+output/
+*.zip
+__pycache__/
+*.pyc
+.venv/
