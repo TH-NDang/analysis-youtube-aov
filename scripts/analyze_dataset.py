@@ -109,6 +109,10 @@ def keyword_score(fields, keywords, normalized_fields=None):
     return best, evidence
 
 
+def has_strong_evidence(evidence, allowed=("title", "tags", "chapters")):
+    return any(item.get("field") in allowed for item in evidence)
+
+
 def load_heroes(config_path, synced_path):
     cfg = read_json(config_path)
     aliases = cfg.get("aliases", {})
@@ -175,7 +179,7 @@ def extract_entities(fields, normalized_fields, heroes, skins, esports):
             description_ok=description_ok,
             normalized_fields=normalized_fields,
         )
-        if score >= 0.22:
+        if score >= 0.38 and has_strong_evidence(evidence):
             hero_mentions.append(
                 {
                     "id": hero["id"],
@@ -199,7 +203,7 @@ def extract_entities(fields, normalized_fields, heroes, skins, esports):
             description_ok=True,
             normalized_fields=normalized_fields,
         )
-        if score >= 0.34:
+        if score >= 0.38 and has_strong_evidence(evidence):
             skin_mentions.append(
                 {
                     "id": skin["id"],
@@ -217,7 +221,7 @@ def extract_entities(fields, normalized_fields, heroes, skins, esports):
             [item["name"]] + item.get("aliases", []),
             normalized_fields=normalized_fields,
         )
-        if score >= 0.22:
+        if score >= 0.38 and has_strong_evidence(evidence, ("title", "chapters")):
             tournament_mentions.append(
                 {
                     "id": item["id"],
@@ -237,7 +241,7 @@ def extract_entities(fields, normalized_fields, heroes, skins, esports):
             description_ok=short >= 4,
             normalized_fields=normalized_fields,
         )
-        if score >= 0.34:
+        if score >= 0.38 and has_strong_evidence(evidence, ("title", "chapters")):
             team_mentions.append(
                 {
                     "id": item["id"],
@@ -255,7 +259,7 @@ def classify_types(fields, normalized_fields, taxonomy):
     evidence = {}
     for label, keywords in taxonomy.get("content_types", {}).items():
         score, ev = keyword_score(fields, keywords, normalized_fields=normalized_fields)
-        if score > 0:
+        if score >= 0.52 and has_strong_evidence(ev):
             scores[label] = round(score, 3)
             evidence[label] = ev
     return scores, evidence
@@ -383,6 +387,7 @@ def main():
     esports_counts = Counter()
     domain_counts = Counter()
     tournament_stats = defaultdict(lambda: Counter())
+    tournament_seasons = defaultdict(lambda: Counter())
     team_stats = defaultdict(lambda: Counter())
     hero_index = defaultdict(list)
     skin_index = defaultdict(list)
@@ -414,10 +419,29 @@ def main():
             game_type_scores, game_evidence = classify_types(fields, normalized_fields, game_tax)
             esports_type_scores, esports_evidence = classify_types(fields, normalized_fields, esports_tax)
 
+            # Hero-specific labels need an actual hero relation. This prevents
+            # generic phrases such as "wombo combo" or "hướng dẫn sự kiện"
+            # from being treated as hero guides.
+            if not hero_mentions:
+                for label in ("hero_spotlight", "hero_guide", "hero_gameplay", "hero_update"):
+                    game_type_scores.pop(label, None)
+                    game_evidence.pop(label, None)
+
             hero_best = max((x["confidence"] for x in hero_mentions), default=0.0)
             skin_best = max((x["confidence"] for x in skin_mentions), default=0.0)
             tournament_best = max((x["confidence"] for x in tournament_mentions), default=0.0)
             team_best = max((x["confidence"] for x in team_mentions), default=0.0)
+
+            # Short content from the sports channel is a useful esports moment
+            # signal only when it is on the sports channel or already anchored
+            # to a tournament/team.
+            sports_channel = "sports" in norm(base.get("channel_handle") or base.get("channel") or "")
+            pre_anchor = max(tournament_best, team_best)
+            if base.get("source_type") == "short" and (sports_channel or pre_anchor >= 0.52):
+                esports_type_scores["short_moment"] = max(
+                    esports_type_scores.get("short_moment", 0.0), 0.70
+                )
+
             game_type_best = max(game_type_scores.values(), default=0.0)
             esports_type_best = max(esports_type_scores.values(), default=0.0)
 
@@ -425,12 +449,43 @@ def main():
                 game_type_scores.get("lore_story", 0.0),
                 game_type_scores.get("cinematic", 0.0),
             )
+
             game_score = max(hero_best, skin_best, game_type_best)
-            esports_signal_bonus = 0.08 if len(team_mentions) >= 2 else 0.0
-            esports_score = min(
-                0.99,
-                max(tournament_best, team_best, esports_type_best) + esports_signal_bonus,
+
+            anchor_type_score = max(
+                esports_type_scores.get("match_full", 0.0),
+                esports_type_scores.get("livestream", 0.0),
+                esports_type_scores.get("interview", 0.0),
+                esports_type_scores.get("roster", 0.0),
+                esports_type_scores.get("tournament_info", 0.0),
             )
+            esports_anchor = max(tournament_best, team_best, anchor_type_score)
+            moment_score = max(
+                esports_type_scores.get("highlight", 0.0),
+                esports_type_scores.get("recap", 0.0),
+                esports_type_scores.get("short_moment", 0.0),
+            )
+
+            if esports_anchor >= 0.52:
+                esports_score = min(
+                    0.99,
+                    max(esports_anchor, esports_type_best)
+                    + (0.08 if len(team_mentions) >= 2 else 0.0),
+                )
+            elif sports_channel and moment_score >= 0.65:
+                esports_score = moment_score
+            else:
+                esports_score = 0.0
+
+            # Event-only labels should not pull a clearly esports-only video
+            # into the game domain.
+            if (
+                esports_score >= 0.65
+                and not hero_mentions
+                and not skin_mentions
+                and set(game_type_scores).issubset({"event_promo"})
+            ):
+                game_score = 0.0
 
             game_types = sorted(game_type_scores, key=game_type_scores.get, reverse=True)
             esports_types = sorted(esports_type_scores, key=esports_type_scores.get, reverse=True)
@@ -492,6 +547,17 @@ def main():
                     }
 
             if esports_score >= 0.34:
+                highlight_kind = None
+                if esports_type_scores.get("highlight", 0) >= 0.52:
+                    if len(team_mentions) >= 2:
+                        highlight_kind = "match"
+                    elif len(team_mentions) == 1:
+                        highlight_kind = "team"
+                    elif tournament_mentions:
+                        highlight_kind = "tournament"
+                    else:
+                        highlight_kind = "general"
+
                 esports_rec = {
                     **base,
                     "domain_score": round(esports_score, 3),
@@ -501,6 +567,7 @@ def main():
                     "teams": team_mentions,
                     "season": season,
                     "game_number": game_number,
+                    "highlight_kind": highlight_kind,
                     "highlight_segments": highlight_segments,
                     "evidence": esports_evidence,
                 }
@@ -511,6 +578,8 @@ def main():
 
                 for t in tournament_mentions:
                     tournament_stats[t["id"]]["videos"] += 1
+                    if season:
+                        tournament_seasons[t["id"]][season] += 1
                     if primary_esports:
                         tournament_stats[t["id"]][primary_esports] += 1
                     tournament_index[t["id"]].append(index_item(base, max(t["confidence"], esports_type_best), primary_esports))
@@ -601,6 +670,10 @@ def main():
             {
                 **entity,
                 "stats": dict(stats),
+                "seasons": [
+                    {"name": name, "videos": count}
+                    for name, count in tournament_seasons[tid].most_common()
+                ],
             }
         )
     tournament_output.sort(key=lambda x: x["stats"].get("videos", 0), reverse=True)
