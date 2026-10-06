@@ -109,6 +109,12 @@ def main():
         print(f"WARNING: cannot load academy page: {exc}")
         links = []
 
+    if not links:
+        links = [
+            {"url": f"{BASE}/hoc-vien/tuong-skin/d/{slugify(name)}/", "anchor_text": name}
+            for name in fallback_names
+        ]
+
     hero_rows = []
     if links:
         with ThreadPoolExecutor(max_workers=args.workers) as ex:
