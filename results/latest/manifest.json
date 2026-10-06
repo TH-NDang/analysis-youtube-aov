@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-10-06T05:40:01Z",
+  "source_repository": "TH-NDang/bao-tang-lien-quan",
+  "source_release_tag": "youtube-deep-2026-10-01",
+  "source_videos": 16988,
+  "analysis_repository": "TH-NDang/analysis-youtube-aov",
+  "analysis_revision": "14ee44ec6217eed7359b2fbd41aaff14d38c99ba",
+  "bridge_workflow_run_id": 37419459400,
+  "artifact_id": 11392471773,
+  "artifact_name": "analysis-youtube-aov",
+  "artifact_expires_at": "2026-11-05T05:39:59Z",
+  "note": "Full generated JSONL/index output is stored as a GitHub Actions artifact; this directory keeps only compact snapshots."
+}
