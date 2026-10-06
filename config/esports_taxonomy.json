@@ -1,0 +1,60 @@
+{
+  "content_types": {
+    "highlight": [
+      "highlight",
+      "highlights",
+      "pha xử lý",
+      "khoảnh khắc",
+      "best moment",
+      "top play",
+      "mvp"
+    ],
+    "match_full": [
+      "full match",
+      "trận đấu",
+      "trận",
+      " vs ",
+      " vs.",
+      "bo3",
+      "bo5",
+      "bo7"
+    ],
+    "livestream": [
+      "trực tiếp",
+      "livestream",
+      "live stream"
+    ],
+    "interview": [
+      "phỏng vấn",
+      "interview",
+      "hậu trường",
+      "behind the scenes"
+    ],
+    "recap": [
+      "recap",
+      "tổng kết",
+      "tổng hợp ngày",
+      "ngày thi đấu",
+      "review giải"
+    ],
+    "roster": [
+      "đội hình",
+      "roster",
+      "chuyển nhượng",
+      "tân binh"
+    ],
+    "tournament_info": [
+      "bốc thăm",
+      "lịch thi đấu",
+      "thể thức",
+      "kết quả bảng",
+      "vòng bảng",
+      "playoff",
+      "chung kết"
+    ],
+    "short_moment": [
+      "shorts",
+      "#shorts"
+    ]
+  }
+}
